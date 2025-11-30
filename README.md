@@ -1,4 +1,4 @@
-# 🎵 Liquid Glass Player
+# 🎵 Hizha Player
 A stunning, modern music player built with Flutter that combines sleek glassmorphism design with powerful audio playback capabilities. Experience your music like never before with this visually immersive audio player.
 
 <img src="https://i.postimg.cc/J0TCP148/Screenshot-2025-11-30-062129.png" alt="appscreenshot" width="600" height="300">
