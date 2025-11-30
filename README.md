@@ -1,7 +1,7 @@
 # 🎵 Liquid Glass Player
 A stunning, modern music player built with Flutter that combines sleek glassmorphism design with powerful audio playback capabilities. Experience your music like never before with this visually immersive audio player.
 
-![Screenshootapp](https://ibb.co/Lh1jXDS7)
+![Screenshootapp]([https://ibb.co/Lh1jXDS7](https://i.postimg.cc/J0TCP148/Screenshot-2025-11-30-062129.png))
 
 ✨ Features
 
