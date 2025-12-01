@@ -16,6 +16,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_media_metadata/flutter_media_metadata.dart';
 import 'dart:io';
 
+// ==================== ENUMS ====================
+enum ThemeMode {
+  dark,
+  transparent,
+}
+
 // ==================== MAIN ====================
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,17 +46,45 @@ void main() async {
   runApp(const LiquidGlassPlayer());
 }
 
+// ==================== THEME PROVIDER ====================
+class ThemeProvider extends ChangeNotifier {
+  ThemeMode _themeMode = ThemeMode.dark;
+  
+  ThemeMode get themeMode => _themeMode;
+  
+  void setTheme(ThemeMode mode) {
+    _themeMode = mode;
+    notifyListeners();
+  }
+  
+  void toggleTheme() {
+    _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.transparent : ThemeMode.dark;
+    notifyListeners();
+  }
+}
+
+// ==================== APP ====================
 class LiquidGlassPlayer extends StatelessWidget {
   const LiquidGlassPlayer({super.key});
+  
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => PlayerProvider(),
-      child: MaterialApp(
-        title: 'Hizha Player',
-        debugShowCheckedModeBanner: false,
-        theme: GlassTheme.darkTheme,
-        home: const HomeScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => PlayerProvider()),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'Hizha Player',
+            debugShowCheckedModeBanner: false,
+            theme: themeProvider.themeMode == ThemeMode.dark 
+                ? GlassTheme.darkTheme 
+                : GlassTheme.transparentTheme,
+            home: const HomeScreen(),
+          );
+        },
       ),
     );
   }
@@ -164,6 +198,7 @@ class GlassTheme {
   // Background Colors
   static const Color bgDark = Color(0xFF0A0A0F);
   static const Color bgCard = Color(0xFF12121A);
+  
   static ThemeData get darkTheme {
     return ThemeData(
       brightness: Brightness.dark,
@@ -212,6 +247,58 @@ class GlassTheme {
         primary: defaultAccent,
         secondary: defaultAccent,
         surface: glassPrimary,
+      ),
+    );
+  }
+  
+  static ThemeData get transparentTheme {
+    return ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.transparent,
+      fontFamily: GoogleFonts.inter().fontFamily,
+      textTheme: TextTheme(
+        displayLarge: GoogleFonts.inter(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: textPrimary,
+          letterSpacing: -1,
+        ),
+        headlineMedium: GoogleFonts.inter(
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: textPrimary,
+          letterSpacing: -0.5,
+        ),
+        titleLarge: GoogleFonts.inter(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: textPrimary,
+        ),
+        titleMedium: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: textPrimary,
+        ),
+        bodyLarge: GoogleFonts.inter(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          color: textPrimary,
+        ),
+        bodyMedium: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+          color: textPrimary.withOpacity(0.9),
+        ),
+        bodySmall: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+          color: textPrimary.withOpacity(0.8),
+        ),
+      ),
+      colorScheme: const ColorScheme.dark(
+        primary: defaultAccent,
+        secondary: defaultAccent,
+        surface: Color(0x10FFFFFF),
       ),
     );
   }
@@ -324,7 +411,6 @@ class PlayerProvider extends ChangeNotifier {
 
   Future<Uint8List?> _extractCoverArt(String filePath) async {
     try {
-      // روش اول: استفاده از MetadataRetriever.fromFile
       final metadata = await MetadataRetriever.fromFile(File(filePath));
       
       if (metadata.albumArt != null && metadata.albumArt!.isNotEmpty) {
@@ -515,6 +601,8 @@ class GlassContainer extends StatefulWidget {
   final VoidCallback? onTap;
   final Gradient? gradient;
   final List<BoxShadow>? boxShadow;
+  final bool forceTransparent;
+
   const GlassContainer({
     super.key,
     required this.child,
@@ -532,6 +620,7 @@ class GlassContainer extends StatefulWidget {
     this.onTap,
     this.gradient,
     this.boxShadow,
+    this.forceTransparent = false,
   });
 
   @override
@@ -544,9 +633,20 @@ class _GlassContainerState extends State<GlassContainer> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PlayerProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
     final accent = provider.accentColor;
-    final bgColor = widget.backgroundColor ?? GlassTheme.glassPrimary;
-    final bdColor = widget.borderColor ?? GlassTheme.glassBorder;
+    
+    final bool isTransparentTheme = themeProvider.themeMode == ThemeMode.transparent || widget.forceTransparent;
+    
+    final bgColor = isTransparentTheme 
+        ? Colors.black.withOpacity(0.15)
+        : (widget.backgroundColor ?? GlassTheme.glassPrimary);
+        
+    final bdColor = isTransparentTheme
+        ? Colors.white.withOpacity(0.2)
+        : (widget.borderColor ?? GlassTheme.glassBorder);
+
+    final double blurAmount = isTransparentTheme ? 3 : widget.blur;
 
     Widget container = MouseRegion(
       onEnter: widget.enableHover ? (_) => setState(() => _isHovered = true) : null,
@@ -562,14 +662,15 @@ class _GlassContainerState extends State<GlassContainer> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.borderRadius),
             boxShadow: widget.boxShadow ?? [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
+              if (!isTransparentTheme)
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
               if (_isHovered && widget.enableHover)
                 BoxShadow(
-                  color: accent.withOpacity(0.15),
+                  color: accent.withOpacity(isTransparentTheme ? 0.1 : 0.15),
                   blurRadius: 50,
                   spreadRadius: 5,
                 ),
@@ -579,8 +680,8 @@ class _GlassContainerState extends State<GlassContainer> {
             borderRadius: BorderRadius.circular(widget.borderRadius),
             child: BackdropFilter(
               filter: ImageFilter.blur(
-                sigmaX: widget.blur,
-                sigmaY: widget.blur,
+                sigmaX: blurAmount,
+                sigmaY: blurAmount,
               ),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
@@ -588,14 +689,19 @@ class _GlassContainerState extends State<GlassContainer> {
                   gradient: widget.gradient ?? LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      bgColor.withOpacity(_isHovered ? 0.22 : 0.15),
-                      bgColor.withOpacity(_isHovered ? 0.12 : 0.08),
-                    ],
+                    colors: isTransparentTheme
+                        ? [
+                            Colors.white.withOpacity(_isHovered ? 0.12 : 0.08),
+                            Colors.white.withOpacity(_isHovered ? 0.08 : 0.05),
+                          ]
+                        : [
+                            bgColor.withOpacity(_isHovered ? 0.22 : 0.15),
+                            bgColor.withOpacity(_isHovered ? 0.12 : 0.08),
+                          ],
                   ),
                   borderRadius: BorderRadius.circular(widget.borderRadius),
                   border: Border.all(
-                    color: _isHovered ? accent.withOpacity(0.3) : bdColor,
+                    color: _isHovered ? accent.withOpacity(isTransparentTheme ? 0.2 : 0.3) : bdColor,
                     width: widget.borderWidth,
                   ),
                 ),
@@ -675,8 +781,10 @@ class _GlassIconButtonState extends State<GlassIconButton> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PlayerProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
     final accent = provider.accentColor;
     final color = widget.color ?? GlassTheme.textPrimary;
+    final isTransparentTheme = themeProvider.themeMode == ThemeMode.transparent;
 
     Widget button = MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -711,22 +819,22 @@ class _GlassIconButtonState extends State<GlassIconButton> with SingleTickerProv
                 decoration: BoxDecoration(
                   color: widget.showBackground
                       ? (widget.isActive
-                          ? accent.withOpacity(0.25)
-                          : (_isHovered ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.05)))
+                          ? accent.withOpacity(isTransparentTheme ? 0.2 : 0.25)
+                          : (_isHovered ? Colors.white.withOpacity(isTransparentTheme ? 0.08 : 0.1) : Colors.white.withOpacity(isTransparentTheme ? 0.04 : 0.05)))
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(widget.size / 3),
                   border: widget.showBackground
                       ? Border.all(
                           color: widget.isActive
-                              ? accent.withOpacity(0.4)
-                              : (_isHovered ? Colors.white.withOpacity(0.15) : Colors.transparent),
+                              ? accent.withOpacity(isTransparentTheme ? 0.3 : 0.4)
+                              : (_isHovered ? Colors.white.withOpacity(isTransparentTheme ? 0.12 : 0.15) : Colors.transparent),
                           width: 1,
                         )
                       : null,
                   boxShadow: widget.isActive
                       ? [
                           BoxShadow(
-                            color: accent.withOpacity(0.3),
+                            color: accent.withOpacity(isTransparentTheme ? 0.2 : 0.3),
                             blurRadius: 12,
                             spreadRadius: 0,
                           ),
@@ -736,7 +844,7 @@ class _GlassIconButtonState extends State<GlassIconButton> with SingleTickerProv
                 child: Icon(
                   widget.icon,
                   size: widget.iconSize,
-                  color: widget.isActive ? accent : (_isHovered ? Colors.white : color.withOpacity(0.8)),
+                  color: widget.isActive ? accent : (_isHovered ? Colors.white : color.withOpacity(isTransparentTheme ? 0.9 : 0.8)),
                 ),
               ),
             );
@@ -800,8 +908,22 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<PlayerProvider>();
-    final accent = provider.accentColor;
+    final playerProvider = context.watch<PlayerProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final accent = playerProvider.accentColor;
+    
+    if (themeProvider.themeMode == ThemeMode.transparent) {
+      return Container(
+        color: Colors.transparent,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+          child: Container(
+            color: Colors.black.withOpacity(0.25),
+          ),
+        ),
+      );
+    }
+    
     return AnimatedBuilder(
       animation: Listenable.merge([_controller, _colorController]),
       builder: (context, child) {
@@ -810,7 +932,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
             animation: _controller.value,
             colorAnimation: _colorController.value,
             accentColor: accent,
-            isPlaying: provider.isPlaying,
+            isPlaying: playerProvider.isPlaying,
           ),
           size: Size.infinite,
         );
@@ -2670,8 +2792,10 @@ class CustomTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<PlayerProvider>();
-    final accent = provider.accentColor;
+    final playerProvider = context.watch<PlayerProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final accent = playerProvider.accentColor;
+    
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onPanStart: (_) => windowManager.startDragging(),
@@ -2745,10 +2869,25 @@ class CustomTitleBar extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            if (provider.currentSong != null)
+            
+            // دکمه سوییچ تم
+            GlassIconButton(
+              icon: themeProvider.themeMode == ThemeMode.dark 
+                  ? Icons.light_mode_rounded 
+                  : Icons.dark_mode_rounded,
+              onPressed: () => themeProvider.toggleTheme(),
+              tooltip: themeProvider.themeMode == ThemeMode.dark 
+                  ? 'Switch to Transparent Theme' 
+                  : 'Switch to Dark Theme',
+              size: 36,
+              iconSize: 18,
+            ),
+            const SizedBox(width: 8),
+            
+            if (playerProvider.currentSong != null)
               _MiniNowPlaying(
-                title: provider.currentSong!.title,
-                isPlaying: provider.isPlaying,
+                title: playerProvider.currentSong!.title,
+                isPlaying: playerProvider.isPlaying,
                 accent: accent,
               ),
             const Spacer(),
@@ -2908,6 +3047,7 @@ class _WindowButton extends StatefulWidget {
   final VoidCallback onPressed;
   final Color hoverColor;
   final bool isClose;
+
   const _WindowButton({
     required this.icon,
     this.iconSize = 16,
@@ -2962,7 +3102,6 @@ class _WindowButtonState extends State<_WindowButton> with SingleTickerProviderS
           animation: _hoverAnimation,
           builder: (context, child) {
             final scale = _isHovered ? 1.1 : 1.0;
-            final shadowOpacity = _isHovered ? (widget.isClose ? 0.5 : 0.2) : 0.0;
             return Transform.scale(
               scale: scale,
               child: Container(
@@ -2971,16 +3110,6 @@ class _WindowButtonState extends State<_WindowButton> with SingleTickerProviderS
                 decoration: BoxDecoration(
                   color: _isHovered ? widget.hoverColor : Colors.transparent,
                   borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    if (_isHovered)
-                      BoxShadow(
-                        color: widget.isClose
-                            ? const Color(0xFFE81123).withOpacity(0.4)
-                            : Colors.white.withOpacity(0.2),
-                        blurRadius: 12,
-                        spreadRadius: 0,
-                      ),
-                  ],
                 ),
                 child: Icon(
                   widget.icon,
