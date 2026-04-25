@@ -2,8 +2,10 @@ name: Build Flutter Windows App
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: true
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -13,27 +15,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Install Flutter with specific version
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.10.4'
-        channel: stable
-        cache: true
+    - name: Install Flutter manually
+      run: |
+        git clone https://github.com/flutter/flutter.git --depth 1 -b stable C:\flutter
+        echo "C:\flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     
-    - name: Enable Windows desktop
+    - name: Check Flutter installation
+      run: flutter --version
+    
+    - name: Enable Windows desktop support
       run: flutter config --enable-windows-desktop
-    
-    - name: Clean previous build
-      run: flutter clean
     
     - name: Get dependencies
       run: flutter pub get
     
-    - name: Build Windows app
+    - name: Build Windows executable
       run: flutter build windows --release
     
-    - name: Upload artifact
+    - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
-        name: windows-app
+        name: windows-release
         path: build/windows/x64/runner/Release/
